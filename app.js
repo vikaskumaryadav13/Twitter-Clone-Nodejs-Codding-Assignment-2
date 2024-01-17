@@ -20,28 +20,31 @@ const initializeDbAndServer = async () => {
       console.log(`Server Running at http://localhost:3000/`)
     })
   } catch (error) {
-    console.log(`DB Error:${error.message}`)
+    console.log(`DB Error: ${error.message}`)
     process.exit(1)
   }
 }
 initializeDbAndServer()
 
-//API:1 REGISTER NEW USER ..................
+//API: Register New User.................
 
 app.post('/register/', async (request, response) => {
   const {username, password, name, gender} = request.body
+
   const userCheckQuery = `
-     SELECT * FROM user WHERE username = '${username}';`
+    SELECT * FROM user WHERE username = '${username}';`
   const dbUser = await db.get(userCheckQuery)
   if (dbUser === undefined) {
     if (password.length < 6) {
       response.status(400)
       response.send('Password is too short')
     } else {
-      const hashedPassword = await bcrypt.hash(password, 10)
+      const hashPassword = await bcrypt.hash(password, 10)
       const registerUserQuery = `
-             INSERT INTO user(username, password, name, gender)
-             VALUES ('${username}', '${hashedPassword}', '${name}', '${gender}');`
+            INSERT INTO 
+                user(username, password, name, gender)
+            VALUES
+                ('${username}', '${hashPassword}', '${name}', '${gender}');`
       await db.run(registerUserQuery)
       response.send('User created successfully')
     }
@@ -60,26 +63,26 @@ const authenticateToken = (request, response, next) => {
     response.status(401)
     response.send('Invalid JWT Token')
   } else {
-    jwt.verify(jwtToken, 'SECRET_KEY', async (error, payload) => {
+    jwt.verify(jwtToken, 'SECRET_KEY', async (error, payLoad) => {
       if (error) {
         response.status(401)
         response.send('Invalid JWT Token')
       } else {
-        request.headers.username = payload.username
+        request.headers.username = payLoad.username
         next()
       }
     })
   }
 }
 
-//API:2 LOGIN USER ..............................
+//API: Login User.............................
 
 app.post('/login/', async (request, response) => {
   const {username, password} = request.body
-  const payload = {username}
-  const jwtToken = jwt.sign(payload, 'SECRET_KEY')
+  const payLoad = {username}
+  const jwtToken = jwt.sign(payLoad, 'SECRET_KEY')
   const userCheckQuery = `
-     SELECT * FROM user WHERE username = '${username}';`
+    SELECT * FROM user WHERE username = '${username}';`
   const dbUser = await db.get(userCheckQuery)
   if (dbUser === undefined) {
     response.status(400)
@@ -98,28 +101,25 @@ const isUserFollowing = async (request, response, next) => {
   const {tweetId} = request.params
   const {username} = request.headers
   const getUserQuery = `
-     SELECT * FROM user WHERE username = '${username}';`
+    SELECT * FROM user WHERE username = '${username}';`
   const dbUser = await db.get(getUserQuery)
   const userId = dbUser['user_id']
-  const followingQuery = `
-     SELECT following_user_id FROM follower WHERE follower_user_id = ${userId};`
+  const followingQuery = `SELECT following_user_id FROM follower WHERE follower_user_id = ${userId};`
   const userFollowingData = await db.all(followingQuery)
 
-  //console.log(userFollowingData);
-
   const tweetUserIdQuery = `
-     SELECT * FROM tweet WHERE tweet_id = ${tweetId};`
+    SELECT * FROM tweet WHERE tweet_id = ${tweetId}`
   const tweetData = await db.get(tweetUserIdQuery)
   const tweetUserID = tweetData['user_id']
 
-  let isTweetUserIDInFollowingIds = false
+  let isTweetUSerIDInFollowingIds = false
   userFollowingData.forEach(each => {
     if (each['following_user_id'] === tweetUserID) {
-      isTweetUserIDInFollowingIds = true
+      isTweetUSerIDInFollowingIds = true
     }
   })
 
-  if (isTweetUserIDInFollowingIds) {
+  if (isTweetUSerIDInFollowingIds) {
     next()
   } else {
     response.status(401)
@@ -127,63 +127,66 @@ const isUserFollowing = async (request, response, next) => {
   }
 }
 
-//API: 3 .................
+//API - 3................................
 
 app.get('/user/tweets/feed/', authenticateToken, async (request, response) => {
   const {username} = request.headers
   const getUserQuery = `
-     SELECT * FROM user WHERE username = '${username}';`
+    SELECT * FROM user WHERE username = '${username}';`
   const dbUser = await db.get(getUserQuery)
   const userId = dbUser['user_id']
 
   const query = `
-     SELECT username, tweet, date_time AS dateTime
-     FROM follower INNER JOIN tweet ON follower.following_user_id = tweet.user_id
-     NATURAL JOIN user
-     WHERE follower.follower_user_id = ${userId}
-     ORDER BY dateTime DESC
-     LIMIT 4;`
+    SELECT username, tweet, date_time As dateTime
+    FROM follower INNER JOIN tweet
+    ON follower.following_user_id = tweet.user_id
+    NATURAL JOIN user
+    WHERE follower.follower_user_id = ${userId}
+    ORDER BY dateTime DESC
+    LIMIT 4`
+
   const data = await db.all(query)
   response.send(data)
 })
 
-//API: 4 ...................
+//API - 4.....................
 
 app.get('/user/following/', authenticateToken, async (request, response) => {
   const {username} = request.headers
   const getUserQuery = `
-     SELECT * FROM user WHERE username = '${username}';`
+    SELECT * FROM user WHERE username = '${username}';`
   const dbUser = await db.get(getUserQuery)
   const userId = dbUser['user_id']
   const query = `
-      SELECT name
-      FROM follower INNER JOIN user
-      ON follower.following_user_id = user.user_id
-      WHERE follower_user_id = ${userId};`
+    SELECT name 
+    FROM follower INNER JOIN user
+    ON follower.following_user_id = user.user_id
+    WHERE follower_user_id = ${userId};`
+
   const data = await db.all(query)
   response.send(data)
 })
 
-//API: 5 ........................
+//API 5...................................
 
 app.get('/user/followers/', authenticateToken, async (request, response) => {
   const {username} = request.headers
   const getUserQuery = `
-     SELECT * FROM user WHERE username = '${username}';`
+    SELECT * FROM user WHERE username = '${username}';`
   const dbUser = await db.get(getUserQuery)
   const userId = dbUser['user_id']
 
   const query = `
-     SELECT name
-     FROM follower INNER JOIN user
-     ON follower.follower_user_id = user.user_id
-     WHERE following_user_id = ${userId};`
+    SELECT name
+    FROM follower INNER JOIN user
+    ON follower.follower_user_id = user.user_id
+    WHERE following_user_id = ${userId};`
 
   const data = await db.all(query)
   response.send(data)
 })
 
-//API: 6 .............................
+//API 6...............................
 
 app.get(
   '/tweets/:tweetId/',
@@ -192,15 +195,15 @@ app.get(
   async (request, response) => {
     const {tweetId} = request.params
     const query = `
-     SELECT tweet, COUNT() AS replies, date_time AS dateTime
-     FROM tweet INNER JOIN reply
-     ON tweet.tweet_id = reply.tweet_id
-     WHERE tweet.tweet_id = ${tweetId};`
+        SELECT tweet, COUNT() AS replies, date_time AS dateTime 
+        FROM tweet INNER JOIN reply
+        ON tweet.tweet_id = reply.tweet_id   
+        WHERE tweet.tweet_id = ${tweetId};`
     const data = await db.get(query)
 
     const likesQuery = `
-     SELECT COUNT() AS likes
-     FROM like WHERE tweet_id = ${tweetId};`
+        SELECT COUNT() AS likes
+        FROM like WHERE tweet_id  = ${tweetId};`
     const {likes} = await db.get(likesQuery)
 
     data.likes = likes
@@ -208,7 +211,7 @@ app.get(
   },
 )
 
-//API: 7 ...............................
+//API 7.....................................
 
 app.get(
   '/tweets/:tweetId/likes/',
@@ -217,17 +220,18 @@ app.get(
   async (request, response) => {
     const {tweetId} = request.params
     const query = `
-      SELECT username
-      FROM like NATURAL JOIN user 
-      WHERE tweet_id = ${tweetId};`
+        SELECT username
+        FROM like NATURAL JOIN user
+        WHERE tweet_id = ${tweetId};`
 
     const data = await db.all(query)
     const usernamesArray = data.map(each => each.username)
+
     response.send({likes: usernamesArray})
   },
 )
 
-//API: 8 ..........................
+//API 8.......................................
 
 app.get(
   '/tweets/:tweetId/replies/',
@@ -236,42 +240,41 @@ app.get(
   async (request, response) => {
     const {tweetId} = request.params
     const query = `
-     SELECT name, reply
-     FROM reply NATURAL JOIN user 
-     WHERE tweet_id = ${tweetId};`
+        SELECT name, reply
+        FROM reply NATURAL JOIN user
+        WHERE tweet_id = ${tweetId};`
+
     const data = await db.all(query)
-
-    //const namesArray = data.map((each) => each.name);
-
     response.send({replies: data})
   },
 )
 
-//API: 9 ...................................
+//API 9.......................................
 
 app.get('/user/tweets/', authenticateToken, async (request, response) => {
   const {username} = request.headers
   const getUserQuery = `
-      SELECT * FROM user WHERE username = '${username}';`
+    SELECT * FROM user WHERE username = '${username}';`
   const dbUser = await db.get(getUserQuery)
   const userId = dbUser['user_id']
 
   const query = `
-      SELECT tweet, COUNT() AS likes, date_time AS dateTime
-      FROM tweet INNER JOIN like
-      ON tweet.tweet_id = like.tweet_id
-      WHERE tweet.user_id = ${userId}
-      GROUP BY tweet.tweet_id;`
+    SELECT tweet, COUNT() AS likes, date_time As dateTime
+    FROM tweet INNER JOIN like
+    ON tweet.tweet_id = like.tweet_id
+    WHERE tweet.user_id = ${userId}
+    GROUP BY tweet.tweet_id;`
   let likesData = await db.all(query)
 
   const repliesQuery = `
-        SELECT tweet, COUNT() AS replies
-        FROM tweet INNER JOIN reply
-        ON tweet.tweet_id = reply.tweet_id
-        WHERE tweet.user_id = ${userId}
-        GROUP BY tweet.tweet_id;`
+    SELECT tweet, COUNT() AS replies
+    FROM tweet INNER JOIN reply
+    ON tweet.tweet_id = reply.tweet_id
+    WHERE tweet.user_id = ${userId}
+    GROUP BY tweet.tweet_id;`
 
   const repliesData = await db.all(repliesQuery)
+
   likesData.forEach(each => {
     for (let data of repliesData) {
       if (each.tweet === data.tweet) {
@@ -283,24 +286,25 @@ app.get('/user/tweets/', authenticateToken, async (request, response) => {
   response.send(likesData)
 })
 
-//API: 10 .................................
+//API 10.............................
 
 app.post('/user/tweets/', authenticateToken, async (request, response) => {
   const {tweet} = request.body
   const {username} = request.headers
-  const getUserQuery = `SELECT * FROM user WHERE username='${username}';`
+  const getUserQuery = `
+    SELECT * FROM user WHERE username = '${username}';`
   const dbUser = await db.get(getUserQuery)
   const userId = dbUser['user_id']
 
   const query = `
-      INSERT INTO 
-       tweet(tweet, user_id)
-      VALUES ('${tweet}', ${userId}`
+    INSERT INTO 
+        tweet(tweet, user_id)
+    VALUES ('${tweet}', ${userId});`
   await db.run(query)
   response.send('Created a Tweet')
 })
 
-//API: 11 .............................
+//API 11................................
 
 app.delete(
   '/tweets/:tweetId/',
@@ -309,14 +313,14 @@ app.delete(
     const {tweetId} = request.params
     const {username} = request.headers
     const getUserQuery = `
-     SELECT * FROM user WHERE username = '${username}';`
+    SELECT * FROM user WHERE username = '${username}';`
     const dbUser = await db.get(getUserQuery)
     const userId = dbUser['user_id']
 
     const userTweetsQuery = `
-      SELECT tweet_id, user_id
-      FROM tweet
-      WHERE user_id = ${userId};`
+    SELECT tweet_id, user_id 
+    FROM tweet
+    WHERE user_id = ${userId};`
     const userTweetsData = await db.all(userTweetsQuery)
 
     let isTweetUsers = false
@@ -325,10 +329,11 @@ app.delete(
         isTweetUsers = true
       }
     })
+
     if (isTweetUsers) {
       const query = `
-         DELETE FROM tweet
-         WHERE tweet_id = ${tweetId};`
+        DELETE FROM tweet
+        WHERE tweet_id = ${tweetId};`
       await db.run(query)
       response.send('Tweet Removed')
     } else {
@@ -338,6 +343,6 @@ app.delete(
   },
 )
 
-//EXPORT THE EXPRESS USING THE DEFAULT EXPORT..............
+//Export the express using the default export........................
 
 module.exports = app
